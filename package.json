@@ -1,0 +1,31 @@
+{
+  "name": "tus-directory-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "tsc && node dist/index.js",
+    "dev": "nodemon - exec 'ts-node' src/index.ts",
+    "lint": "eslint . - ext .ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "nod",
+  "license": "ISC",
+  "dependencies": {
+    "@tus/file-store": "^1.2.0",
+    "@tus/s3-store": "^1.3.0",
+    "@tus/server": "^1.3.0",
+    "@types/express": "^4.17.21",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "eslint": "^8.56.0",
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "nodemon": "^3.0.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
