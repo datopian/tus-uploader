@@ -1,5 +1,4 @@
-## Tus Node server for tus resumable directory upload 
-
+## Express js server for tus resumable directory upload 
 ### Installation
 ```bash
 npm install
@@ -19,4 +18,4 @@ S3_REGION=
 
 
 ### Notes
-It does not support R2 storage yet.
+It does not work with R2 as [CloudFlare](https://developers.cloudflare.com/r2/api/s3/api/#implemented-bucket-level-operations),  does not yet support the `x-amz-tagging-directive` header in R2.
