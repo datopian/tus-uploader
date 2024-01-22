@@ -1,5 +1,5 @@
 {
-  "name": "tus-directory-server",
+  "name": "tus-uploader",
   "version": "1.0.0",
   "description": "",
   "main": "dist/index.js",
