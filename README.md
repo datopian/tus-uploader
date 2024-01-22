@@ -1,4 +1,4 @@
-## Express js server for tus resumable directory upload 
+## Express js tus server for  resumable file and folder  upload 
 ### Installation
 ```bash
 npm install
@@ -14,6 +14,14 @@ S3_ENDPOINT=
 S3_ACCESS_KEY=
 S3_ACCESS_SECRET=
 S3_REGION=
+```
+
+### Authentication & Authorization
+Provive public key in .env file or public key file path in .env file
+
+``` bash
+AUTH_PUBLIC_KEY_FILE=
+AUTH_PUBLIC_KEY= 
 ```
 
 
