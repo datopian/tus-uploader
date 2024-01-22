@@ -11,6 +11,7 @@ import { authenticate } from './auth'
 dotenv.config()
 const app = express();
 const port = process.env.SERVER_PORT || 4000
+const enableFolderUpload = process.env.ENABLE_FOLDER_UPLOAD === 'true' || false
 
 const uploadApp = express()
 
@@ -43,24 +44,20 @@ const server = new Server({
   },
 
   generateUrl(req: http.IncomingMessage, { proto, host, path, id }) {
-    let key = null
-    let meta = Metadata.parse(req.headers['upload-metadata'] as string)
-    if (meta.relativePath !== 'null') {
-      key = meta.relativePath
-    } else {
-      key = meta.name
-    }
-    let url = `${proto}://${host}${path}/${key}`
+    let url = `${proto}://${host}${path}/${id}`
     return url
   },
 
   namingFunction: (req: http.IncomingMessage) => {
+    let name = ""
     let meta: any = Metadata.parse(req.headers['upload-metadata'] as string)
-    if (meta.relativePath !== 'null') {
-      return decodeURIComponent(meta.relativePath)
+    const prefix = meta.prefix || ''
+    if (meta.relativePath !== 'null' && enableFolderUpload ) {
+       name = meta.relativePath
     } else {
-      return decodeURIComponent(meta.name)
+       name = meta.name
     }
+    return decodeURIComponent(prefix + name)
   },
 
   getFileIdFromRequest: (req: http.IncomingMessage) => {
