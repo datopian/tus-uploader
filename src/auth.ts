@@ -79,7 +79,8 @@ const authorization = (scopeStr: string): boolean => {
   const scope: Scope = Scope.fromString(scopeStr);
   // TODO: implement more authorization logic provided from scope 
   // for now it just checks if the scope has write access
-  return scope.actions.includes('write');
+  const allowedActions = ['create', 'patch', 'update'];
+  return scope.actions.some(item => allowedActions.includes(item));
 }
 
 export const authenticate = async (request: http.IncomingMessage): Promise<boolean | void> => {
