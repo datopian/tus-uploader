@@ -45,17 +45,21 @@ const server = new Server({
 
   generateUrl(req: http.IncomingMessage, { proto, host, path, id }) {
     let url = `${proto}://${host}${path}/${id}`
-    return url
+    return decodeURIComponent(url)
+  },
+
+  onResponseError: (req: http.IncomingMessage, res: http.ServerResponse, err: any) => {
+    console.error(err)
   },
 
   namingFunction: (req: http.IncomingMessage) => {
     let name = ""
     let meta: any = Metadata.parse(req.headers['upload-metadata'] as string)
     const prefix = meta.prefix || ''
-    if (meta.relativePath !== 'null' && enableFolderUpload ) {
-       name = meta.relativePath
+    if (meta.relativePath !== 'null' && enableFolderUpload) {
+      name = meta.relativePath
     } else {
-       name = meta.name
+      name = meta.name
     }
     return decodeURIComponent(prefix + name)
   },
