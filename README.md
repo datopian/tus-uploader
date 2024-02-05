@@ -26,6 +26,8 @@ Provive public key in .env file or public key file path in .env file
 ``` bash
 AUTH_PUBLIC_KEY_FILE=
 AUTH_PUBLIC_KEY= 
+SESSION_SECRET= # secret session key
+SCOPE_TYPE=CKAN # CKAN authz type or any other scope type saparated by space
 ```
 
 ## Frontend Implementation

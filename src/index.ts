@@ -1,19 +1,46 @@
 import http from 'node:http'
 import path from 'path'
 import dotenv from 'dotenv'
-import express, { Request, Response } from 'express'
+import express, { Response, NextFunction } from 'express'
 import { Server, Metadata } from '@tus/server'
-import { S3Store } from './store/s3store/index'
+import cors from "cors"
 
+import { S3Store } from './store/s3store/index'
+import session from 'express-session'
 import { authenticate } from './auth'
 
+import { Request } from './types'
 
 dotenv.config()
 const app = express();
+const uploadApp = express()
+
 const port = process.env.SERVER_PORT || 4000
 const enableFolderUpload = process.env.ENABLE_FOLDER_UPLOAD === 'true' || false
 
-const uploadApp = express()
+const corsOptions = {
+  origin: (process.env.CORS_ORIGIN || '*').split(' '),
+  credentials: true,
+  optionSuccessStatus: 200,
+}
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET as string || 'secret',
+    resave: false,
+    saveUninitialized: true,
+    name: 'uploader-session',
+    cookie: {
+      secure: false,
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: parseInt(process.env.SESSION_EXPIRY || '86400'), // Default 24 hours,
+    }
+  })
+)
+
+app.use(cors(corsOptions))
+uploadApp.use(cors(corsOptions))
 
 const s3StoreDatastore = new S3Store({
   partSize: 8 * 1024 * 1024, // each uploaded part will have ~8MiB,
@@ -32,26 +59,13 @@ const server = new Server({
   path: '/uploads',
   datastore: s3StoreDatastore,
   relativeLocation: true,
-  async onIncomingRequest(req, res) {
-    try {
-      const authenticated: boolean | void = await authenticate(req)
-      if (!authenticated) {
-        throw new Error('Authentication failed')
-      }
-    } catch (e: any) {
-      throw { status_code: 401, body: e.message }
-    }
-  },
-
   generateUrl(req: http.IncomingMessage, { proto, host, path, id }) {
     let url = `${proto}://${host}${path}/${id}`
     return decodeURIComponent(url)
   },
-
-  onResponseError: (req: http.IncomingMessage, res: http.ServerResponse, err: any) => {
+  onResponseError: (req, res, err) => {
     console.error(err)
   },
-
   namingFunction: (req: http.IncomingMessage) => {
     let name = ""
     let meta: any = Metadata.parse(req.headers['upload-metadata'] as string)
@@ -64,13 +78,27 @@ const server = new Server({
     return decodeURIComponent(prefix + name)
   },
 
-  getFileIdFromRequest: (req: http.IncomingMessage) => {
+  getFileIdFromRequest: (req: Request) => {
     const newPath = path.join(path.sep, ...(req.url?.split(path.sep).slice(2) ?? []));
     return decodeURIComponent(newPath)
   }
 })
 
-uploadApp.all('*', server.handle.bind(server))
+const authenticateUser = async (req: Request, res: Response, next: NextFunction) => {
+  const token = await authenticate(req)
+  const user = req.session.userId
+  if (user) {
+    next()
+  } else if (token && token.authorized) {
+    req.session.userId = token.userId
+    next()
+  } else {
+    res.status(401).send("Unauthorized user")
+  }
+}
+
+uploadApp.all('*', authenticateUser, server.handle.bind(server))
+
 app.use('/', uploadApp)
 
 app.listen(port, () => {

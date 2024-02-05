@@ -79,19 +79,27 @@ const authorization = (scopeStr: string): boolean => {
   const scope: Scope = Scope.fromString(scopeStr);
   // TODO: implement more authorization logic provided from scope 
   // for now it just checks if the scope has write access
-  const allowedActions = ['create', 'patch', 'update'];
-  return scope.actions.some(item => allowedActions.includes(item));
+  const allowedActions = ['create', 'patch', 'update', 'write'];
+  if (process.env.SCOPE_TYPE === 'CKAN') {
+    return scope.actions.some(item => allowedActions.includes(item))
+  } else {
+    return allowedActions.some(action => scopeStr.includes(action));
+  }
 }
 
-export const authenticate = async (request: http.IncomingMessage): Promise<boolean | void> => {
+export const authenticate = async (request: http.IncomingMessage): Promise<any> => {
   const token = getToken(request)
   const JWT_PUBLIC_KEY: string = await getPublicKey()
   if (token) {
     try {
       const decoded: any = JWT.verify(token, JWT_PUBLIC_KEY, { algorithms: ['RS256'] })
-      return authorization(decoded.scopes)
-    } catch (err) {
-      throw err
+      return {
+        userId: decoded.sub,
+        authorized: authorization(decoded.scopes)
+      }
+    } catch (err: any) {
+      console.error(`Error verifying token: ${err.message}`)
+      return
     }
   }
 }
