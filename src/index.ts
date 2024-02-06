@@ -97,6 +97,26 @@ const authenticateUser = async (req: Request, res: Response, next: NextFunction)
   }
 }
 
+uploadApp.use('/object-count', authenticateUser, async (req: Request, res: Response) => {
+  const params = req.query
+  params.prefix = params.prefix || ''
+  if (!params.prefix && params.prefix !== '') {
+    res.status(400).json({ message: 'Prefix is required' })
+  }
+  const count = await s3StoreDatastore.getObjectsCount()
+  res.json({ count })
+})
+
+uploadApp.use('/object-clear', authenticateUser, async (req: Request, res: Response) => {
+  const params = req.query
+  params.prefix = params.prefix || ''
+  if (!params.prefix && params.prefix !== '') {
+    res.status(400).json({ message: 'Prefix is required' })
+  }
+  await s3StoreDatastore.clearObjects(params.prefix)
+  res.json({ message: 'Objects cleared' })
+})
+
 uploadApp.all('*', authenticateUser, server.handle.bind(server))
 
 app.use('/', uploadApp)
