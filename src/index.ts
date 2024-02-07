@@ -44,6 +44,7 @@ uploadApp.use(cors(corsOptions))
 
 const s3StoreDatastore = new S3Store({
   partSize: 8 * 1024 * 1024, // each uploaded part will have ~8MiB,
+  useTags: process.env.S3_USE_TAGS === 'true' || false,
   s3ClientConfig: {
     bucket: process.env.S3_BUCKET as string,
     endpoint: process.env.S3_ENDPOINT as string,
@@ -63,9 +64,16 @@ const server = new Server({
     let url = `${proto}://${host}${path}/${id}`
     return decodeURIComponent(url)
   },
-  onResponseError: (req, res, err) => {
-    console.error(err)
+
+  onResponseError: (req, res, err: any) => {
+    // if error type is aborted, then it means the request was aborted by the client
+    if (err.message === 'aborted') {
+      console.log('Request aborted by the client')
+    } else {
+      console.error('Request failed:', err)
+    }
   },
+
   namingFunction: (req: http.IncomingMessage) => {
     let name = ""
     let meta: any = Metadata.parse(req.headers['upload-metadata'] as string)
@@ -79,7 +87,7 @@ const server = new Server({
   },
 
   getFileIdFromRequest: (req: Request) => {
-    const newPath = path.join(path.sep, ...(req.url?.split(path.sep).slice(2) ?? []));
+    const newPath = req.url.replace('/uploads/', '')
     return decodeURIComponent(newPath)
   }
 })
