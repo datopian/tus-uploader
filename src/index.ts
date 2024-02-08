@@ -6,6 +6,8 @@ import { Server, Metadata } from '@tus/server'
 import cors from "cors"
 
 import { S3Store } from './store/s3store/index'
+import {FileStore} from '@tus/file-store'
+
 import session from 'express-session'
 import { authenticate } from './auth'
 
@@ -56,9 +58,19 @@ const s3StoreDatastore = new S3Store({
   }
 })
 
+const fileStoreDatastore = new FileStore({
+  directory : path.resolve(process.env.FILE_STORE_PATH as string || './uploads'),
+  expirationPeriodInMilliseconds: parseInt(process.env.FILE_STORE_EXPIRY || '86400000') // Default 24 hours
+})
+
+const store = {
+  "s3_store": s3StoreDatastore,
+  "file_store": fileStoreDatastore
+}
+
 const server = new Server({
   path: '/uploads',
-  datastore: s3StoreDatastore,
+  datastore: store[process.env.STORE_TYPE as keyof typeof store || 'file_store'],
   relativeLocation: true,
   generateUrl(req: http.IncomingMessage, { proto, host, path, id }) {
     let url = `${proto}://${host}${path}/${id}`
