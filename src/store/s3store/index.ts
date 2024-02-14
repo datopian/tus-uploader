@@ -747,24 +747,6 @@ export class S3Store extends DataStore {
 
     return deleted
   }
-  
-  public getObjectsCount(prefix = '') {
-    return this.client.listObjectsV2({Bucket: this.bucket, Prefix: prefix}).then((data: any) => {
-      return data.KeyCount
-    })
-  }
-
-  public clearObjects(prefix = '') {
-    return this.client.listObjectsV2({Bucket: this.bucket, Prefix: prefix}).then((data: any) => {
-      if (data.Contents) {
-        return this.client.deleteObjects({
-          Bucket: this.bucket,
-          Delete: {
-            Objects: data.Contents.map((content: any) => ({Key: content.Key})),
-          },
-        })
-      }
-    })
-  }
+    
 }
 
