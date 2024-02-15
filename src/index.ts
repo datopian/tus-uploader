@@ -6,7 +6,7 @@ import { Server, Metadata } from '@tus/server'
 import cors from "cors"
 
 import { S3Store } from './store/s3store/index'
-import { FileStore } from '@tus/file-store'
+import { FileStore, MemoryConfigstore } from '@tus/file-store'
 
 import session from 'express-session'
 import { authenticate } from './auth'
@@ -58,7 +58,8 @@ const s3StoreDatastore = new S3Store({
 
 const fileStoreDatastore = new FileStore({
   directory: path.resolve(process.env.FILE_STORE_PATH as string || './uploads'),
-  expirationPeriodInMilliseconds: parseInt(process.env.FILE_STORE_EXPIRY || '86400000') // Default 24 hours
+  expirationPeriodInMilliseconds: parseInt(process.env.FILE_STORE_EXPIRY || '86400000'), // Default 24 hours
+  configstore: new MemoryConfigstore()
 })
 
 const store = {
@@ -88,7 +89,7 @@ const server = new Server({
   namingFunction: (req: http.IncomingMessage) => {
     let name = ""
     let meta: any = Metadata.parse(req.headers['upload-metadata'] as string)
-    const prefix = meta.prefix || ''
+    const prefix = meta.resourceID + '/'
     if (meta.relativePath !== 'null' && enableFolderUpload) {
       name = meta.relativePath
     } else {
@@ -119,13 +120,9 @@ const authenticateUser = async (req: Request, res: Response, next: NextFunction)
 
 uploadApp.all('*', server.handle.bind(server))
 
-
-
-app.use('/uploads', (req, res, next) => {
+app.use('/', (req, res, next) => {
   authenticateUser(req, res, next)
 }, uploadApp)
-
-
 
 
 app.listen(port, () => {
