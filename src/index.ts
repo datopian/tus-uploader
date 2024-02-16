@@ -6,7 +6,7 @@ import { Server, Metadata } from '@tus/server'
 import cors from "cors"
 
 import { S3Store } from './store/s3store/index'
-import { FileStore, MemoryConfigstore } from '@tus/file-store'
+import { FileStore, MemoryConfigstore, Configstore } from '@tus/file-store'
 
 import session from 'express-session'
 import { authenticate } from './auth'
@@ -59,7 +59,7 @@ const s3StoreDatastore = new S3Store({
 const fileStoreDatastore = new FileStore({
   directory: path.resolve(process.env.FILE_STORE_PATH as string || './uploads'),
   expirationPeriodInMilliseconds: parseInt(process.env.FILE_STORE_EXPIRY || '86400000'), // Default 24 hours
-  configstore: new MemoryConfigstore()
+  configstore: new MemoryConfigstore(),
 })
 
 const store = {
@@ -72,7 +72,7 @@ const server = new Server({
   datastore: store[process.env.STORE_TYPE as keyof typeof store || 'file_store'],
   relativeLocation: true,
   generateUrl(req: http.IncomingMessage, { proto, host, path, id }) {
-    let serverUrl:string = (process.env.SERVER_URL ?? host).replace(/\/$/, '')
+    let serverUrl: string = (process.env.SERVER_URL ?? host).replace(/\/$/, '')
     let url = `${serverUrl}${path}/${id}`
     return decodeURIComponent(url)
   },
@@ -104,8 +104,29 @@ const server = new Server({
   }
 })
 
+const getMetadataFromConfig = async (key: string) => {
+  const meta: Configstore = fileStoreDatastore.configstore
+  return await meta.get(decodeURIComponent(key))
+}
+
+const getMeatadatFromHeader = (req: Request) => {
+  let meta : Record<string, any> = {}
+  meta.size =  req.headers['content-length']
+  meta.id = req.url.replace('/uploads/', '')
+  meta.metadata = Metadata.parse(req.headers['upload-metadata'] as string)
+  return meta
+}
+
 const authenticateUser = async (req: Request, res: Response, next: NextFunction) => {
-  const token = await authenticate(req)
+  let metadata: Record<string, any> = {}
+  if (req.method === 'POST') {
+    metadata = getMeatadatFromHeader(req)
+  } else {
+    const url = req.url.replace('/uploads/', '')
+    metadata = await getMetadataFromConfig(url) || {}
+  }
+
+  const token = await authenticate(req, metadata)
   const user = req.session.userId
   if (user) {
     next()
@@ -117,13 +138,11 @@ const authenticateUser = async (req: Request, res: Response, next: NextFunction)
   }
 }
 
-
 uploadApp.all('*', server.handle.bind(server))
 
 app.use('/', (req, res, next) => {
   authenticateUser(req, res, next)
 }, uploadApp)
-
 
 app.listen(port, () => {
   console.log(`Server running at http://127.0.0.1:${port}`)

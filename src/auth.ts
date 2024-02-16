@@ -31,13 +31,13 @@ const getPublicKey = async (): Promise<string> => {
 }
 
 class Scope {
-  entity_type: string
-  entity_id: string = '*'
+  entityType: string
+  entityId: string = '*'
   subscope: string = '*'
   actions: string[] = []
 
   constructor(entity: string) {
-    this.entity_type = entity
+    this.entityType = entity
   }
 
   static fromString(scopeStr: string): Scope {
@@ -48,7 +48,7 @@ class Scope {
     const scope = new Scope(parts[0])
 
     if (parts[1] !== '*') {
-      scope.entity_id = parts[1]
+      scope.entityId = parts[1]
     }
 
     if (parts[2] !== '*') {
@@ -66,15 +66,15 @@ class Scope {
   }
 }
 
-const authorization = (scopeStr: string, dataset_id: string, user: string): boolean => {
+const authorization = (scopeStr: string, objectId: string, user: string): boolean => {
   const scope: Scope = Scope.fromString(scopeStr);
   const allowedActions = ['create', 'patch', 'update', 'write'];
   if (process.env.SCOPE_TYPE === 'CKAN') {
-    const isEntityIdValid = (scope: Scope, dataset_id: string): boolean => scope.entity_id === dataset_id
+    const isEntityIdValid = (scope: Scope, objectId: string): boolean => scope.entityId === objectId
     const isSubscopeValid = (scope: Scope): boolean => scope.subscope === 'data'
-    const isEntityTypeValid = (scope: Scope): boolean => scope.entity_type === 'ds'
+    const isEntityTypeValid = (scope: Scope): boolean => scope.entityType === 'ds'
     const areActionsValid = (scope: Scope, allowedActions: string[]): boolean => scope.actions.some(item => allowedActions.includes(item))
-    return isEntityIdValid(scope, dataset_id) &&
+    return isEntityIdValid(scope, objectId) &&
       isSubscopeValid(scope) &&
       isEntityTypeValid(scope) &&
       areActionsValid(scope, allowedActions)
@@ -85,23 +85,8 @@ const authorization = (scopeStr: string, dataset_id: string, user: string): bool
 }
 
 
-const extractObjectIdFromUrl = (url: string): string => {
-  const URLparts = url.split('/');
-  return URLparts[2];
-}
-
-const extractObjectIdFromMetadata = (metadataHeader: string): string => {
-  const meta: any = Metadata.parse(metadataHeader);
-  return meta.resourceID
-}
-
-export const authenticate = async (request: http.IncomingMessage): Promise<any> => {
-  let objectId = extractObjectIdFromUrl(request.url as string);
-
-  if (!objectId && request.headers['upload-metadata']) {
-    objectId = extractObjectIdFromMetadata(request.headers['upload-metadata'] as string);
-  }
-
+export const authenticate = async (request: http.IncomingMessage, meta: Record<string, any> ): Promise<any> => {
+  const  objectId = meta.metadata.datasetID || meta.metadata.objectId
   const token = getToken(request)
   const JWT_PUBLIC_KEY: string = await getPublicKey()
   if (token) {
