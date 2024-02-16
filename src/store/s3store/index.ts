@@ -164,7 +164,7 @@ export class S3Store extends DataStore {
    * There's a small and simple caching mechanism to avoid multiple
    * HTTP calls to S3.
    */
-  private async getMetadata(id: string): Promise<MetadataValue> {
+  public async getMetadata(id: string): Promise<MetadataValue> {
     const cached = await this.cache.get(id)
     if (cached) {
       return cached

@@ -2,7 +2,6 @@ import JWT from 'jsonwebtoken'
 import http from 'node:http'
 import fs from 'fs'
 import { promisify } from 'util'
-import { Metadata } from '@tus/server'
 
 const getToken = (req: any) => {
   const authHeader = req.headers['authorization']

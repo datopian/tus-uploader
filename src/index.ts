@@ -2,12 +2,11 @@ import http from 'node:http'
 import path from 'path'
 import dotenv from 'dotenv'
 import express, { Response, NextFunction } from 'express'
-import { Server, Metadata } from '@tus/server'
+import { Server, Metadata, MemoryKvStore} from '@tus/server'
 import cors from "cors"
 
-import { S3Store } from './store/s3store/index'
+import { S3Store} from './store/s3store/index'
 import { FileStore, MemoryConfigstore, Configstore } from '@tus/file-store'
-
 import session from 'express-session'
 import { authenticate } from './auth'
 
@@ -53,7 +52,8 @@ const s3StoreDatastore = new S3Store({
       secretAccessKey: process.env.S3_ACCESS_SECRET as string,
     },
     region: process.env.S3_REGION || 'auto' as string,
-  }
+  },
+  cache: new MemoryKvStore(),
 })
 
 const fileStoreDatastore = new FileStore({
@@ -106,7 +106,13 @@ const server = new Server({
 
 const getMetadataFromConfig = async (key: string) => {
   const meta: Configstore = fileStoreDatastore.configstore
-  return await meta.get(decodeURIComponent(key))
+
+  if (process.env.STORE_TYPE === 'file_store') {
+    return (await meta.get(decodeURIComponent(key)))
+  } 
+  if (process.env.STORE_TYPE === 's3_store'){
+    return (await s3StoreDatastore.getMetadata(key)).file
+  }
 }
 
 const getMeatadatFromHeader = (req: Request) => {
