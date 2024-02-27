@@ -2,10 +2,10 @@ import http from 'node:http'
 import path from 'path'
 import dotenv from 'dotenv'
 import express, { Response, NextFunction } from 'express'
-import { Server, Metadata, MemoryKvStore} from '@tus/server'
+import { Server, Metadata, MemoryKvStore } from '@tus/server'
 import cors from "cors"
 
-import { S3Store} from './store/s3store/index'
+import { S3Store } from './store/s3store/index'
 import { FileStore, MemoryConfigstore, Configstore } from '@tus/file-store'
 import session from 'express-session'
 import { authenticate } from './auth'
@@ -109,15 +109,15 @@ const getMetadataFromConfig = async (key: string) => {
 
   if (process.env.STORE_TYPE === 'file_store') {
     return (await meta.get(decodeURIComponent(key)))
-  } 
-  if (process.env.STORE_TYPE === 's3_store'){
+  }
+  if (process.env.STORE_TYPE === 's3_store') {
     return (await s3StoreDatastore.getMetadata(key)).file
   }
 }
 
 const getMeatadatFromHeader = (req: Request) => {
-  let meta : Record<string, any> = {}
-  meta.size =  req.headers['content-length']
+  let meta: Record<string, any> = {}
+  meta.size = req.headers['content-length']
   meta.id = req.url.replace('/uploads/', '')
   meta.metadata = Metadata.parse(req.headers['upload-metadata'] as string)
   return meta

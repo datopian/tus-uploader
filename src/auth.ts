@@ -68,24 +68,36 @@ class Scope {
 const authorization = (scopeStr: string, objectId: string, user: string): boolean => {
   const scope: Scope = Scope.fromString(scopeStr);
   const allowedActions = ['create', 'patch', 'update', 'write'];
+  let isEntityIdValid: (scope: Scope, objectId: string) => boolean;
   if (process.env.SCOPE_TYPE === 'CKAN') {
-    const isEntityIdValid = (scope: Scope, objectId: string): boolean => scope.entityId === objectId
-    const isSubscopeValid = (scope: Scope): boolean => scope.subscope === 'data'
-    const isEntityTypeValid = (scope: Scope): boolean => scope.entityType === 'ds'
-    const areActionsValid = (scope: Scope, allowedActions: string[]): boolean => scope.actions.some(item => allowedActions.includes(item))
+    if (scope.entityId === 'ignore-object-check') {
+      isEntityIdValid = (scope: Scope, objectId: string): boolean => true;
+    } else {
+      isEntityIdValid = (scope: Scope, objectId: string): boolean => scope.entityId === objectId;
+    }
+    const isSubscopeValid = (scope: Scope): boolean => scope.subscope === 'data';
+    const isEntityTypeValid = (scope: Scope): boolean => scope.entityType === 'ds';
+    const areActionsValid = (scope: Scope, allowedActions: string[]): boolean => scope.actions.some(item => allowedActions.includes(item));
+
     return isEntityIdValid(scope, objectId) &&
       isSubscopeValid(scope) &&
       isEntityTypeValid(scope) &&
-      areActionsValid(scope, allowedActions)
+      areActionsValid(scope, allowedActions);
   } else {
-    return allowedActions.some(action => scopeStr.includes(action))
+    return allowedActions.some(action => scopeStr.includes(action));
   }
-  return false
 }
 
 
-export const authenticate = async (request: http.IncomingMessage, meta: Record<string, any> ): Promise<any> => {
-  const  objectId = meta.metadata.datasetID || meta.metadata.objectId
+export const authenticate = async (request: http.IncomingMessage, meta: Record<string, any>): Promise<any> => {
+  let objectId;
+  if (Object.keys(meta).length == 0 && request.method === 'HEAD') {    
+    // HEAD requests don't have metadata and only used of checking offset
+    // so we can ignore the object check
+    objectId = 'ignore-object-check'
+  } else {
+    objectId = meta.metadata.datasetID || meta.metadata.objectId
+  }
   const token = getToken(request)
   const JWT_PUBLIC_KEY: string = await getPublicKey()
   if (token) {
