@@ -9,13 +9,35 @@ npm start
 Udate .env file with your values
 
 ```bash
-S3_BUCKET= 
-S3_ENDPOINT=
-S3_ACCESS_KEY=
-S3_ACCESS_SECRET=
-S3_REGION=
-```
+SERVER_PORT=4000
+SERVER_URL=http://127.0.0.1:4000
+ENABLE_FOLDER_UPLOAD=true # enable folder upload
+SERVER_UPLOAD_PATH=/uploads
 
+CORS_ORIGIN="http://localhost:3000"
+REDIS_URL=redis://localhost:6379/0
+
+# S3 storage configuration
+S3_BUCKET=<bucket name>
+S3_ENDPOINT=http://127.0.0.1:9000/
+S3_ACCESS_KEY=<access key>
+S3_ACCESS_SECRET=<access secret>
+S3_REGION=<region> 
+
+# You can disable tags by setting this to false, if your s3 server does not support tags eg. for R2 stroage
+S3_USE_TAGS=true 
+
+# Store configuration  it can be memory, s3_store or file_store
+STORE_TYPE=s3_store
+
+# Upload path when using file store 
+FILE_STORE_PATH=./uploads
+FILE_STORE_EXPIRY=86400000
+
+# Config store can be memory, redis,  file
+CONFIG_STORE=memory
+CONFIG_STORE_PATH=./uploads
+```
 
 ### Authentication & Authorization
 
@@ -44,15 +66,4 @@ new Uppy({
         },
         endpoint: "http://127.0.0.1:4000", // tus upload url
     });
-```
-
-### Notes
-If you are using tus-js-client, you need to set useTags to false in storage configuration
-
-```
-new S3Store({
-  ...restOptions
-  useTags: false
-})
-
 ```
