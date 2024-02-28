@@ -3,6 +3,8 @@ import http from 'node:http'
 import fs from 'fs'
 import { promisify } from 'util'
 
+import { config } from './config'
+
 const getToken = (req: any) => {
   const authHeader = req.headers['authorization']
   const token = authHeader && authHeader.split(' ')[1]
@@ -10,8 +12,8 @@ const getToken = (req: any) => {
 }
 
 const getPublicKey = async (): Promise<string> => {
-  const publicKey: string | undefined = process.env.AUTH_PUBLIC_KEY
-  const publicKeyFile: string | undefined = process.env.AUTH_PUBLIC_KEY_FILE
+  const publicKey: string | undefined = config.authPublicKey
+  const publicKeyFile: string | undefined = config.authPublicKeyFile
 
   if (!publicKey && publicKeyFile) {
     try {
@@ -69,7 +71,7 @@ const authorization = (scopeStr: string, objectId: string, user: string): boolea
   const scope: Scope = Scope.fromString(scopeStr);
   const allowedActions = ['create', 'patch', 'update', 'write'];
   let isEntityIdValid: (scope: Scope, objectId: string) => boolean;
-  if (process.env.SCOPE_TYPE === 'CKAN') {
+  if (config.scopeType === 'CKAN') {
     if (scope.entityId === 'ignore-object-check') {
       isEntityIdValid = (scope: Scope, objectId: string): boolean => true;
     } else {

@@ -2,52 +2,52 @@ import http from 'node:http'
 import path from 'path'
 
 import cors from "cors"
-import dotenv from 'dotenv'
 import express, { Response, NextFunction } from 'express'
 import session from 'express-session'
+import bodyParser from 'body-parser'
 import { createClient } from '@redis/client'
 import { Server, Metadata, MemoryKvStore, RedisKvStore, FileKvStore } from '@tus/server'
 import { FileStore } from '@tus/file-store'
 import { S3Store } from '@tus/s3-store'
 
 import { authenticate } from './auth'
+import { config } from "./config"
 
 import { Request } from './types'
 
-dotenv.config()
 
 const app = express()
 const uploadApp = express()
 
-const port = process.env.SERVER_PORT || 4000
-const enableFolderUpload = process.env.ENABLE_FOLDER_UPLOAD === 'true' || false
+const port = config.serverPort
+const enableFolderUpload = config.enableFolderUpload
 
 const corsOptions = {
-  origin: (process.env.CORS_ORIGIN || '*').split(' '),
+  origin: (config.corsOrigin || '*').split(' '),
   credentials: true,
 }
 
 app.use(
   session({
-    secret: process.env.SESSION_SECRET as string || 'secret',
+    secret: config.sessionSecret,
     resave: false,
     saveUninitialized: true,
-    name: 'uploader-session',
+    name: 'up-session',
     cookie: {
       secure: false,
       httpOnly: true,
       sameSite: 'lax',
-      maxAge: parseInt(process.env.SESSION_EXPIRY || '86400'), // Default 24 hours,
+      maxAge: config.sessionExpiry, // Default 24 hours,
     }
   })
 )
 
+app.use(bodyParser.json())
 app.use(cors(corsOptions))
-
 
 const createRedisClient = () => {
   const redisClient = createClient({
-    url: process.env.REDIS_URL || 'redis://localhost:6379/3'
+    url: config.redisUrl
   })
   redisClient.on("error", (error: Error) => console.error(`Error : ${error}`))
   redisClient.connect()
@@ -55,7 +55,7 @@ const createRedisClient = () => {
 }
 
 const configStore = () => {
-  switch (process.env.CONFIG_STORE) {
+  switch (config.storeType) {
     case 'memory':
       return new MemoryKvStore()
     case 'redis':
@@ -65,29 +65,30 @@ const configStore = () => {
       }
       return new RedisKvStore(redisClient as any, '')
     default:
-      return new FileKvStore(path.resolve(process.env.CONFIG_STORE_PATH as string || './uploads'))
+      return new FileKvStore(path.resolve(config.fileStorePath))
   }
 }
 
 const s3StoreDatastore = new S3Store({
   partSize: 8 * 1024 * 1024, // each uploaded part will have ~8MiB,
-  useTags: process.env.S3_USE_TAGS === 'true' || false,
+  useTags: config.s3UseTags,
   s3ClientConfig: {
-    bucket: process.env.S3_BUCKET as string,
-    endpoint: process.env.S3_ENDPOINT as string,
+    bucket: config.s3Bucket,
+    endpoint: config.s3Endpoint,
     credentials: {
-      accessKeyId: process.env.S3_ACCESS_KEY as string,
-      secretAccessKey: process.env.S3_ACCESS_SECRET as string,
+      accessKeyId: config.s3AccessKey,
+      secretAccessKey: config.s3AccessSecret
     },
-    region: process.env.S3_REGION || 'auto' as string,
+    region: config.s3Region
   },
-  cache: configStore() as any
+  //@ts-ignore
+  cache: configStore() 
 })
 
 const fileStoreDatastore = new FileStore({
-  directory: path.resolve(process.env.FILE_STORE_PATH as string || './uploads'),
-  expirationPeriodInMilliseconds: parseInt(process.env.FILE_STORE_EXPIRY || '86400000'), // Default 24 hours
-  configstore: configStore() as any
+  directory: path.resolve(config.fileStorePath),
+  expirationPeriodInMilliseconds: config.fileStoreExpiry, 
+  configstore: configStore() 
 })
 
 const store = {
@@ -96,15 +97,15 @@ const store = {
 }
 
 const getFileIdFromRequest = (req: Request) => {
-  return decodeURIComponent(req.url.replace('/uploads/', ''))
+  return decodeURIComponent(req.url.replace(config.serverUploadPath + '/', ''))
 }
 
 const server = new Server({
-  path: process.env.SERVER_UPLOAD_PATH || '/uploads',
-  datastore: store[process.env.STORE_TYPE as keyof typeof store || 'file_store'],
+  path: config.serverUploadPath,
+  datastore: store[config.storeType as keyof typeof store],
   relativeLocation: true,
   generateUrl(req: http.IncomingMessage, { proto, host, path, id }) {
-    let serverUrl: string = (process.env.SERVER_URL ?? host).replace(/\/$/, '')
+    let serverUrl: string = (config.serverUrl ?? host).replace(/\/$/, '')
     let url = `${serverUrl}${path}/${id}`
     return decodeURIComponent(url)
   },
@@ -135,15 +136,14 @@ const server = new Server({
   }
 })
 
-
 const getMetadataFromConfig = async (req: Request) => {
   const key = getFileIdFromRequest(req)
-  if (process.env.STORE_TYPE === 'file_store') {
+  if (config.storeType === 'file_store') {
     const meta = fileStoreDatastore.configstore
     return await meta.get(decodeURIComponent(key))
   }
 
-  if (process.env.STORE_TYPE === 's3_store') {
+  if (config.storeType === 's3_store') {
     const meta: any = await s3StoreDatastore
     let data = await meta.getMetadata(decodeURIComponent(key))
     return data.file
@@ -180,6 +180,7 @@ const authenticateUser = async (req: Request, res: Response, next: NextFunction)
 
 uploadApp.all('*', server.handle.bind(server))
 
+// Tus upload server 
 app.use('/', (req, res, next) => {
   authenticateUser(req, res, next)
 }, uploadApp)
@@ -187,5 +188,5 @@ app.use('/', (req, res, next) => {
 
 app.listen(port, () => {
   console.log(`Server running at http://127.0.0.1:${port}`)
-  console.log(`Running with store: "${process.env.STORE_TYPE}" and "${process.env.CONFIG_STORE}" config store`)
+  console.log(`Running server with : "${config.storeType}" and "${config.configStore}" config store`)
 })
