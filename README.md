@@ -52,6 +52,18 @@ SESSION_SECRET= # secret session key
 SCOPE_TYPE=CKAN # CKAN authz type or any other scope type saparated by space
 ```
 
+
+### Uppy Companion upload 
+You can also use [uppy companion](https://uppy.io/docs/companion/) to upload files and folders to tus server
+
+```env
+COMPANION_UPLOAD_ENABLE=true
+COMPANION_TEM_DIR=./uploads
+COMPANION_DOMAIN=http://localhost:3020
+COMPANION_DROPBOX_KEY=
+COMPANION_DROPBOX_SECRET=
+```
+
 ## Frontend Implementation
 You could use [uppy](https://uppy.io/) to upload files and folders to tus server or use [tus-js-client](https://github.com/tus/tus-js-client)
 

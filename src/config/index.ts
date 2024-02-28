@@ -37,6 +37,13 @@ const envs = {
     fileStoreExpiry: parseInt(process.env.FILE_STORE_EXPIRY as string) || 86400000,
     configStore: process.env.CONFIG_STORE || 'memory',
 
+    // Uppy companion configuration
+    companionUppyUpload: process.env.COMPANION_UPLOAD_ENABLE === 'true' || false,
+    campanionSecret: process.env.COMPANION_SECRET || 'some-secret',
+    campanionTempPath: process.env.COMPANION_TEMP_PATH || './uploads/tmp',
+    companionDomain: process.env.COMPANION_DOMAIN || 'http://localhost:3020',
+    companionDropboxKey: process.env.COMPANION_DROPBOX_KEY as string,
+    companionDropboxSecret: process.env.COMPANION_DROPBOX_SECRET as string,
 }
 
 export const config = {

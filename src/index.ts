@@ -12,6 +12,7 @@ import { S3Store } from '@tus/s3-store'
 
 import { authenticate } from './auth'
 import { config } from "./config"
+import companion from './companion'
 
 import { Request } from './types'
 
@@ -159,26 +160,34 @@ const getMeatadatFromHeader = (req: Request) => {
 }
 
 const authenticateUser = async (req: Request, res: Response, next: NextFunction) => {
-  let metadata: Record<string, any> = {};
+  let metadata: Record<string, any> = {}
 
   if (req.method === 'POST') {
-    metadata = getMeatadatFromHeader(req);
+    metadata = getMeatadatFromHeader(req)
   } else if (req.method !== 'HEAD') {
-    metadata = await getMetadataFromConfig(req) || {};
+    metadata = await getMetadataFromConfig(req) || {}
   }
 
-  const token = await authenticate(req, metadata);
-  const user = req.session.userId;
+  const token = await authenticate(req, metadata)
+  const user = req.session.userId
 
   if (user || (token && token.authorized)) {
-    req.session.userId = token.userId;
-    next();
+    req.session.userId = token.userId
+    next()
   } else {
-    res.status(401).send("Unauthorized user");
+    res.status(401).send("Unauthorized user")
   }
 }
 
 uploadApp.all('*', server.handle.bind(server))
+
+
+// Uppy companion server
+if (config.companionUppyUpload) {
+  console.log(`Running with Uppy Companion at ${config.companionDomain}`)
+  app.use('/', companion.app)
+  companion.socket(app.listen(3020))
+}
 
 // Tus upload server 
 app.use('/', (req, res, next) => {
