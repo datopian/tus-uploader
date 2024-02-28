@@ -56,7 +56,7 @@ SCOPE_TYPE=CKAN # CKAN authz type or any other scope type saparated by space
 ### Uppy Companion upload 
 You can also use [uppy companion](https://uppy.io/docs/companion/) to upload files and folders to tus server
 
-```env
+```bash
 COMPANION_UPLOAD_ENABLE=true
 COMPANION_TEM_DIR=./uploads
 COMPANION_DOMAIN=http://localhost:3020

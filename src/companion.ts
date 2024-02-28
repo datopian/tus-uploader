@@ -12,8 +12,8 @@ const companionOptions = {
 		},
 	},
 	server: {
-		host: companionDomain.split('://')[0],
-		protocol: companionDomain.split('://')[1]
+		host: companionDomain.split('://')[1],
+		protocol: companionDomain.split('://')[0]
 	},
 	path: '/',
 	filePath: config.campanionTempPath,
@@ -23,8 +23,9 @@ const companionOptions = {
 
 let appResult = companion.app(companionOptions)
 
-export default {
+export = {
 	app: appResult.app,
+	emitter: appResult.emitter,
 	socket: companion.socket,
 }
 

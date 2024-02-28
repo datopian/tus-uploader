@@ -181,13 +181,27 @@ const authenticateUser = async (req: Request, res: Response, next: NextFunction)
 
 uploadApp.all('*', server.handle.bind(server))
 
-
 // Uppy companion server
 if (config.companionUppyUpload) {
   console.log(`Running with Uppy Companion at ${config.companionDomain}`)
   app.use('/', companion.app)
   companion.socket(app.listen(3020))
 }
+
+companion.emitter.on('upload-start', ({ token }: any) => {
+  console.log('Upload started', token)
+  function onUploadEvent ({ action, payload } : any) {
+    if (action === 'success') {
+      companion.emitter.off(token, onUploadEvent) // avoid listener leak
+      console.log('Upload finished', token, payload.url)
+    } else if (action === 'error') {
+      companion.emitter.off(token, onUploadEvent) // avoid listener leak
+      console.error('Upload failed', payload)
+    }
+  }
+  companion.emitter.on(token, onUploadEvent)
+})
+
 
 // Tus upload server 
 app.use('/', (req, res, next) => {
