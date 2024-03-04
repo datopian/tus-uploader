@@ -1,4 +1,5 @@
 import { FileStore, Configstore } from '@tus/file-store'
+import fs from 'node:fs'
 
 
 type Options = {
