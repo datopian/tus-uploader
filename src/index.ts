@@ -176,6 +176,12 @@ companion.emitter.on('upload-start', ({ token }: any) => {
   companion.emitter.on(token, onUploadEvent)
 })
 
+// Log all requests
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`)
+  next()
+})
+
 app.post('/folder_delete', authenticateUser, (req, res, next) => {
   if (!req.body.folder) {
     res.status(400).json({ error: "folder path is required" })
