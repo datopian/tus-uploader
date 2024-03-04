@@ -7,7 +7,7 @@ import session from 'express-session'
 import bodyParser from 'body-parser'
 import { createClient } from '@redis/client'
 import { Server, Metadata, MemoryKvStore, RedisKvStore, FileKvStore } from '@tus/server'
-import { FileStore } from '@tus/file-store'
+import { ExtendedFileStore } from './store/Filestore'
 import { S3Store } from '@tus/s3-store'
 
 import { authenticate } from './auth'
@@ -83,13 +83,13 @@ const s3StoreDatastore = new S3Store({
     region: config.s3Region
   },
   //@ts-ignore
-  cache: configStore() 
+  cache: configStore()
 })
 
-const fileStoreDatastore = new FileStore({
+const fileStoreDatastore = new ExtendedFileStore({
   directory: path.resolve(config.fileStorePath),
-  expirationPeriodInMilliseconds: config.fileStoreExpiry, 
-  configstore: configStore() 
+  expirationPeriodInMilliseconds: config.fileStoreExpiry,
+  configstore: configStore()
 })
 
 const store = {
@@ -190,7 +190,7 @@ if (config.companionUppyUpload) {
 
 companion.emitter.on('upload-start', ({ token }: any) => {
   console.log('Upload started', token)
-  function onUploadEvent ({ action, payload } : any) {
+  function onUploadEvent({ action, payload }: any) {
     if (action === 'success') {
       companion.emitter.off(token, onUploadEvent) // avoid listener leak
       console.log('Upload finished', token, payload.url)
@@ -202,12 +202,39 @@ companion.emitter.on('upload-start', ({ token }: any) => {
   companion.emitter.on(token, onUploadEvent)
 })
 
+app.post('/folder_delete', (req, res, next) => {
+  if (!req.body.folder) {
+    res.status(400).json({ error: "folder path is required" })
+  }
+  const folderPath = path.resolve(config.fileStorePath) + '/' + req.body.folder
+  try {
+    fileStoreDatastore.removeFolder(folderPath)
+    res.status(200).json({ message: "folder removed successfully" })
+  } catch (error) {
+    res.status(404).json({ error: "folder not found, or error occured" })
+  }
+   // TODO: Add S3 folder remove
+})
+
+app.post('/folder_detail', async (req, res, next) => {
+  if (!req.body.folder) {
+    res.status(400).json({ error: "folder path is required" })
+  }
+  const folderPath = path.resolve(config.fileStorePath) + '/' + req.body.folder
+
+  try {
+    const folderInfo = await fileStoreDatastore.getFolderInfo(folderPath)
+    res.status(200).json(folderInfo)
+  } catch (error) {
+    res.status(404).json({ error: "folder not found, or error occured" })
+  }
+  // TODO: Add S3 folder details
+})
 
 // Tus upload server 
 app.use('/', (req, res, next) => {
   authenticateUser(req, res, next)
 }, uploadApp)
-
 
 app.listen(port, () => {
   console.log(`Server running at http://127.0.0.1:${port}`)
