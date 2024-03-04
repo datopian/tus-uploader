@@ -7,7 +7,7 @@ import session from 'express-session'
 import bodyParser from 'body-parser'
 import { createClient } from '@redis/client'
 import { Server, Metadata, MemoryKvStore, RedisKvStore, FileKvStore } from '@tus/server'
-import { FileStore } from '@tus/file-store'
+import { ExtendedFileStore } from './store/Filestore'
 import { S3Store } from '@tus/s3-store'
 
 import { authenticate } from './auth'
@@ -56,7 +56,7 @@ const createRedisClient = () => {
 }
 
 const configStore = () => {
-  switch (config.storeType) {
+  switch (config.configStore) {
     case 'memory':
       return new MemoryKvStore()
     case 'redis':
@@ -83,13 +83,13 @@ const s3StoreDatastore = new S3Store({
     region: config.s3Region
   },
   //@ts-ignore
-  cache: configStore() 
+  cache: configStore()
 })
 
-const fileStoreDatastore = new FileStore({
+const fileStoreDatastore = new ExtendedFileStore({
   directory: path.resolve(config.fileStorePath),
-  expirationPeriodInMilliseconds: config.fileStoreExpiry, 
-  configstore: configStore() 
+  expirationPeriodInMilliseconds: config.fileStoreExpiry,
+  configstore: configStore()
 })
 
 const store = {
@@ -137,38 +137,12 @@ const server = new Server({
   }
 })
 
-const getMetadataFromConfig = async (req: Request) => {
-  const key = getFileIdFromRequest(req)
-  if (config.storeType === 'file_store') {
-    const meta = fileStoreDatastore.configstore
-    return await meta.get(decodeURIComponent(key))
-  }
-
-  if (config.storeType === 's3_store') {
-    const meta: any = await s3StoreDatastore
-    let data = await meta.getMetadata(decodeURIComponent(key))
-    return data.file
-  }
-}
-
-const getMeatadatFromHeader = (req: Request) => {
-  let meta: Record<string, any> = {}
-  meta.size = req.headers['content-length']
-  meta.id = getFileIdFromRequest(req)
-  meta.metadata = Metadata.parse(req.headers['upload-metadata'] as string)
-  return meta
-}
 
 const authenticateUser = async (req: Request, res: Response, next: NextFunction) => {
-  let metadata: Record<string, any> = {}
 
-  if (req.method === 'POST') {
-    metadata = getMeatadatFromHeader(req)
-  } else if (req.method !== 'HEAD') {
-    metadata = await getMetadataFromConfig(req) || {}
-  }
+  const objectId = req.headers['x-object-id'] as string // get object id from header
 
-  const token = await authenticate(req, metadata)
+  const token = await authenticate(req, objectId)
   const user = req.session.userId
 
   if (user || (token && token.authorized)) {
@@ -190,7 +164,7 @@ if (config.companionUppyUpload) {
 
 companion.emitter.on('upload-start', ({ token }: any) => {
   console.log('Upload started', token)
-  function onUploadEvent ({ action, payload } : any) {
+  function onUploadEvent({ action, payload }: any) {
     if (action === 'success') {
       companion.emitter.off(token, onUploadEvent) // avoid listener leak
       console.log('Upload finished', token, payload.url)
@@ -202,12 +176,45 @@ companion.emitter.on('upload-start', ({ token }: any) => {
   companion.emitter.on(token, onUploadEvent)
 })
 
+// Log all requests
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`)
+  next()
+})
+
+app.post('/folder_delete', authenticateUser, (req, res, next) => {
+  if (!req.body.folder) {
+    res.status(400).json({ error: "folder path is required" })
+  }
+  const folderPath = path.resolve(config.fileStorePath) + '/' + req.body.folder
+  try {
+    fileStoreDatastore.removeFolder(folderPath)
+    res.status(200).json({ message: "folder removed successfully" })
+  } catch (error) {
+    res.status(404).json({ error: "folder not found, or error occured" })
+  }
+   // TODO: Add S3 folder remove
+})
+
+app.post('/folder_detail', authenticateUser, async (req, res, next) => {
+  if (!req.body.folder) {
+    res.status(400).json({ error: "folder path is required" })
+  }
+  const folderPath = path.resolve(config.fileStorePath) + '/' + req.body.folder
+
+  try {
+    const folderInfo = await fileStoreDatastore.getFolderInfo(folderPath)
+    res.status(200).json(folderInfo)
+  } catch (error) {
+    res.status(404).json({ error: "folder not found, or error occured" })
+  }
+  // TODO: Add S3 folder details
+})
 
 // Tus upload server 
 app.use('/', (req, res, next) => {
   authenticateUser(req, res, next)
 }, uploadApp)
-
 
 app.listen(port, () => {
   console.log(`Server running at http://127.0.0.1:${port}`)
