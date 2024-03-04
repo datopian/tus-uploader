@@ -56,7 +56,7 @@ const createRedisClient = () => {
 }
 
 const configStore = () => {
-  switch (config.storeType) {
+  switch (config.configStore) {
     case 'memory':
       return new MemoryKvStore()
     case 'redis':
