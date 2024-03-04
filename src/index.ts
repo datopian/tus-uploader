@@ -137,38 +137,12 @@ const server = new Server({
   }
 })
 
-const getMetadataFromConfig = async (req: Request) => {
-  const key = getFileIdFromRequest(req)
-  if (config.storeType === 'file_store') {
-    const meta = fileStoreDatastore.configstore
-    return await meta.get(decodeURIComponent(key))
-  }
-
-  if (config.storeType === 's3_store') {
-    const meta: any = await s3StoreDatastore
-    let data = await meta.getMetadata(decodeURIComponent(key))
-    return data.file
-  }
-}
-
-const getMeatadatFromHeader = (req: Request) => {
-  let meta: Record<string, any> = {}
-  meta.size = req.headers['content-length']
-  meta.id = getFileIdFromRequest(req)
-  meta.metadata = Metadata.parse(req.headers['upload-metadata'] as string)
-  return meta
-}
 
 const authenticateUser = async (req: Request, res: Response, next: NextFunction) => {
-  let metadata: Record<string, any> = {}
 
-  if (req.method === 'POST') {
-    metadata = getMeatadatFromHeader(req)
-  } else if (req.method !== 'HEAD') {
-    metadata = await getMetadataFromConfig(req) || {}
-  }
+  const objectId = req.headers['x-object-id'] as string // get object id from header
 
-  const token = await authenticate(req, metadata)
+  const token = await authenticate(req, objectId)
   const user = req.session.userId
 
   if (user || (token && token.authorized)) {
@@ -202,7 +176,7 @@ companion.emitter.on('upload-start', ({ token }: any) => {
   companion.emitter.on(token, onUploadEvent)
 })
 
-app.post('/folder_delete', (req, res, next) => {
+app.post('/folder_delete', authenticateUser, (req, res, next) => {
   if (!req.body.folder) {
     res.status(400).json({ error: "folder path is required" })
   }
@@ -216,7 +190,7 @@ app.post('/folder_delete', (req, res, next) => {
    // TODO: Add S3 folder remove
 })
 
-app.post('/folder_detail', async (req, res, next) => {
+app.post('/folder_detail', authenticateUser, async (req, res, next) => {
   if (!req.body.folder) {
     res.status(400).json({ error: "folder path is required" })
   }

@@ -6,7 +6,7 @@ import { promisify } from 'util'
 import { config } from './config'
 
 const getToken = (req: any) => {
-  const authHeader = req.headers['authorization']
+  const authHeader = req.headers.authorization
   const token = authHeader && authHeader.split(' ')[1]
   return token
 }
@@ -70,13 +70,8 @@ class Scope {
 const authorization = (scopeStr: string, objectId: string, user: string): boolean => {
   const scope: Scope = Scope.fromString(scopeStr);
   const allowedActions = ['create', 'patch', 'update', 'write'];
-  let isEntityIdValid: (scope: Scope, objectId: string) => boolean;
   if (config.scopeType === 'CKAN') {
-    if (scope.entityId === 'ignore-object-check') {
-      isEntityIdValid = (scope: Scope, objectId: string): boolean => true;
-    } else {
-      isEntityIdValid = (scope: Scope, objectId: string): boolean => scope.entityId === objectId;
-    }
+    const isEntityIdValid = (scope: Scope, objectId: string): boolean => scope.entityId === objectId;
     const isSubscopeValid = (scope: Scope): boolean => scope.subscope === 'data';
     const isEntityTypeValid = (scope: Scope): boolean => scope.entityType === 'ds';
     const areActionsValid = (scope: Scope, allowedActions: string[]): boolean => scope.actions.some(item => allowedActions.includes(item));
@@ -90,16 +85,7 @@ const authorization = (scopeStr: string, objectId: string, user: string): boolea
   }
 }
 
-
-export const authenticate = async (request: http.IncomingMessage, meta: Record<string, any>): Promise<any> => {
-  let objectId;
-  if (Object.keys(meta).length == 0 && request.method === 'HEAD') {    
-    // HEAD requests don't have metadata and only used of checking offset
-    // so we can ignore the object check
-    objectId = 'ignore-object-check'
-  } else {
-    objectId = meta.metadata.datasetID || meta.metadata.objectId
-  }
+export const authenticate = async (request: http.IncomingMessage, objectId: string): Promise<any> => {
   const token = getToken(request)
   const JWT_PUBLIC_KEY: string = await getPublicKey()
   if (token) {
