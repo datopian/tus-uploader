@@ -28,9 +28,9 @@ export class ExtendedFileStore extends FileStore {
     super(options)
   }
   // Remove the folder
-  async removeFolder(folder: string) {
+  async removeFolder(id_or_path: string) {
     return new Promise((resolve, reject) => {
-      fs.rmdir(folder, { recursive: true }, (err) => {
+      fs.rmdir(id_or_path, { recursive: true }, (err) => {
         if (err) {
           reject(err)
         } else {
@@ -40,11 +40,11 @@ export class ExtendedFileStore extends FileStore {
     })
   }
 
-  private traverseDirectory = (dir: string,
+  private traverseDirectory = (dir_path: string,
     fileCount = 0, size = 0, fileList: string[] = []) => {
-    const files = fs.readdirSync(dir);
+    const files = fs.readdirSync(dir_path);
     for (let file of files) {
-      let fullPath = path.join(dir, file);
+      let fullPath = path.join(dir_path, file);
       let stats = fs.statSync(fullPath);
       if (stats.isDirectory()) {
         ({ fileCount, size, fileList } =
@@ -52,20 +52,20 @@ export class ExtendedFileStore extends FileStore {
       } else {
         fileCount++;
         size += stats.size;
-        let relativePath = path.relative(dir, fullPath);
+        let relativePath = path.relative(dir_path, fullPath);
         fileList.push(relativePath);
       }
     }
     return { fileCount, size, fileList };
   }
 
-  async getFolderInfo(dir: string) {
+  async getFolderInfo(id_or_path: string) {
     return new Promise((resolve, reject) => {
-      if (!fs.existsSync(dir)) {
+      if (!fs.existsSync(id_or_path)) {
         return { fileCount: 0, readSize: '0 Bytes', fileList: [] };
       }
       try {
-        let { fileCount, size, fileList } = this.traverseDirectory(dir);
+        let { fileCount, size, fileList } = this.traverseDirectory(id_or_path);
         let readSize = formatBytes(size);
         resolve({ fileCount, readSize, fileList });
       } catch (err) {
@@ -73,5 +73,4 @@ export class ExtendedFileStore extends FileStore {
       }
     })
   }
-
 }

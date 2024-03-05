@@ -64,6 +64,7 @@ COMPANION_DROPBOX_KEY=
 COMPANION_DROPBOX_SECRET=
 ```
 
+
 ## Frontend Implementation
 You could use [uppy](https://uppy.io/) to upload files and folders to tus server or use [tus-js-client](https://github.com/tus/tus-js-client)
 
@@ -78,4 +79,24 @@ new Uppy({
         },
         endpoint: "http://127.0.0.1:4000", // tus upload url
     });
+```
+
+## API
+### Get files details (Auth required)
+
+```bash
+POST /api/1/files
+Params: 
+{
+    "id_or_path": "<path>"
+}
+
+```
+### Remove file or folder (Auth required)
+```bash
+POST /api/1/file/remove
+Params: 
+{
+    "id_or_path": "<path>"
+}
 ```

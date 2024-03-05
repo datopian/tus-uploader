@@ -182,31 +182,32 @@ app.use((req, res, next) => {
   next()
 })
 
-app.post('/folder_delete', authenticateUser, (req, res, next) => {
-  if (!req.body.folder) {
-    res.status(400).json({ error: "folder path is required" })
+app.post('/api/1/file/remove', authenticateUser, (req, res, next) => {
+  if (!req.body.id_or_path) {
+    res.status(400).json({ error: "file id or path is required" })
   }
-  const folderPath = path.resolve(config.fileStorePath) + '/' + req.body.folder
+  
+  const folderPath = path.resolve(config.fileStorePath) + '/' + req.body.id_or_path
   try {
     fileStoreDatastore.removeFolder(folderPath)
-    res.status(200).json({ message: "folder removed successfully" })
+    res.status(200).json({ message: "file or folder removed" })
   } catch (error) {
-    res.status(404).json({ error: "folder not found, or error occured" })
+    res.status(404).json({ error: "file or folder not found, or error occured" })
   }
    // TODO: Add S3 folder remove
 })
 
-app.post('/folder_detail', authenticateUser, async (req, res, next) => {
-  if (!req.body.folder) {
-    res.status(400).json({ error: "folder path is required" })
+app.post('/api/1/files', authenticateUser, async (req, res, next) => {
+  if (!req.body.id_or_path) {
+    res.status(400).json({ error: "file id or path is required" })
   }
-  const folderPath = path.resolve(config.fileStorePath) + '/' + req.body.folder
+  const folderPath = path.resolve(config.fileStorePath) + '/' + req.body.id_or_path
 
   try {
     const folderInfo = await fileStoreDatastore.getFolderInfo(folderPath)
     res.status(200).json(folderInfo)
   } catch (error) {
-    res.status(404).json({ error: "folder not found, or error occured" })
+    res.status(404).json({ error: "file or folder not found, or error occured" })
   }
   // TODO: Add S3 folder details
 })
