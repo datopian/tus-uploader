@@ -1,5 +1,6 @@
 import { FileStore, Configstore } from '@tus/file-store'
 import fs from 'node:fs'
+import path from 'node:path'
 
 
 type Options = {
@@ -37,26 +38,40 @@ export class ExtendedFileStore extends FileStore {
         }
       })
     })
-
   }
 
-  // Get the folder info ex: size, file count
-  async getFolderInfo(folder: string) {
+  private traverseDirectory = (dir: string,
+    fileCount = 0, size = 0, fileList: string[] = []) => {
+    const files = fs.readdirSync(dir);
+    for (let file of files) {
+      let fullPath = path.join(dir, file);
+      let stats = fs.statSync(fullPath);
+      if (stats.isDirectory()) {
+        ({ fileCount, size, fileList } =
+          this.traverseDirectory(fullPath, fileCount, size, fileList));
+      } else {
+        fileCount++;
+        size += stats.size;
+        let relativePath = path.relative(dir, fullPath);
+        fileList.push(relativePath);
+      }
+    }
+    return { fileCount, size, fileList };
+  }
+
+  async getFolderInfo(dir: string) {
     return new Promise((resolve, reject) => {
-      fs.readdir(folder, (err, files) => {
-        if (err) {
-          reject(err)
-        } else {
-          let fileCount = files.length
-          let size = 0
-          let readSize = ''
-          files.forEach((file) => {
-            size += fs.statSync(folder + '/' + file).size
-          })
-          readSize = formatBytes(size)
-          resolve({ fileCount, readSize })
-        }
-      })
+      if (!fs.existsSync(dir)) {
+        return { fileCount: 0, readSize: '0 Bytes', fileList: [] };
+      }
+      try {
+        let { fileCount, size, fileList } = this.traverseDirectory(dir);
+        let readSize = formatBytes(size);
+        resolve({ fileCount, readSize, fileList });
+      } catch (err) {
+        reject(err);
+      }
     })
   }
+
 }
