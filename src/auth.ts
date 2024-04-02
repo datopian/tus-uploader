@@ -67,25 +67,31 @@ class Scope {
   }
 }
 
-const authorization = (scopeStr: string, objectId: string, user: string): boolean => {
+const authorization = (action:string, scopeStr: string, objectId: string, user: string): boolean => {
   const scope: Scope = Scope.fromString(scopeStr);
-  const allowedActions = ['create', 'patch', 'update', 'write'];
+  const readAllowedScope = ['read']; // Download file etc..
+  const writeAlloweScope = ['create', 'patch', 'update', 'write'];
   if (config.scopeType === 'CKAN') {
     const isEntityIdValid = (scope: Scope, objectId: string): boolean => scope.entityId === objectId;
     const isSubscopeValid = (scope: Scope): boolean => scope.subscope === 'data';
     const isEntityTypeValid = (scope: Scope): boolean => scope.entityType === 'ds';
-    const areActionsValid = (scope: Scope, allowedActions: string[]): boolean => scope.actions.some(item => allowedActions.includes(item));
-
+    let areActionsValid;
+    if (action === 'read') {
+      areActionsValid = (scope: Scope): boolean => scope.actions.some(item => readAllowedScope.includes(item));
+    } else {
+      areActionsValid = (scope: Scope): boolean => scope.actions.some(item => writeAlloweScope.includes(item));
+    }
     return isEntityIdValid(scope, objectId) &&
       isSubscopeValid(scope) &&
       isEntityTypeValid(scope) &&
-      areActionsValid(scope, allowedActions);
+      areActionsValid(scope);
   } else {
-    return allowedActions.some(action => scopeStr.includes(action));
+    return writeAlloweScope.some(action => scopeStr.includes(action));
   }
 }
 
 export const authenticate = async (request: http.IncomingMessage, objectId: string): Promise<any> => {
+  const action  = request.method == 'GET' ? 'read' : 'write'
   const token = getToken(request)
   const JWT_PUBLIC_KEY: string = await getPublicKey()
   if (token) {
@@ -93,7 +99,7 @@ export const authenticate = async (request: http.IncomingMessage, objectId: stri
       const decoded: any = JWT.verify(token, JWT_PUBLIC_KEY, { algorithms: ['RS256'] })
       return {
         userId: decoded.sub,
-        authorized: authorization(decoded.scopes, objectId, decoded.sub)
+        authorized: authorization(action, decoded.scopes, objectId, decoded.sub)
       }
     } catch (err: any) {
       console.error(`Error verifying token: ${err.message}`)

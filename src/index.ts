@@ -139,12 +139,10 @@ const server = new Server({
 
 
 const authenticateUser = async (req: Request, res: Response, next: NextFunction) => {
-
   const objectId = req.headers['x-object-id'] as string // get object id from header
 
   const token = await authenticate(req, objectId)
   const user = req.session.userId
-
   if (user || (token && token.authorized)) {
     req.session.userId = token.userId
     next()
@@ -154,6 +152,12 @@ const authenticateUser = async (req: Request, res: Response, next: NextFunction)
 }
 
 uploadApp.all('*', server.handle.bind(server))
+
+// Log all requests
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`)
+  next()
+})
 
 // Uppy companion server
 if (config.companionUppyUpload) {
@@ -186,7 +190,7 @@ app.post('/api/1/file/remove', authenticateUser, (req, res, next) => {
   if (!req.body.id_or_path) {
     res.status(400).json({ error: "file id or path is required" })
   }
-  
+
   const folderPath = path.resolve(config.fileStorePath) + '/' + req.body.id_or_path
   try {
     fileStoreDatastore.removeFolder(folderPath)
@@ -194,7 +198,7 @@ app.post('/api/1/file/remove', authenticateUser, (req, res, next) => {
   } catch (error) {
     res.status(404).json({ error: "file or folder not found, or error occured" })
   }
-   // TODO: Add S3 folder remove
+  // TODO: Add S3 folder remove
 })
 
 app.post('/api/1/files', authenticateUser, async (req, res, next) => {
@@ -212,9 +216,22 @@ app.post('/api/1/files', authenticateUser, async (req, res, next) => {
   // TODO: Add S3 folder details
 })
 
+app.get('/download/*', authenticateUser,  async (req: Request, res, next) => {
+  var filepath = req.params[0] || ''
+  let fileName = path.basename(filepath)
+  try {
+    const fileStream = fileStoreDatastore.downloadFile(filepath);
+    return fileStream.pipe(res);
+  } catch (error) {
+    res.setHeader('Content-Disposition', '');
+    res.status(404).send("file not found")
+  }
+})
+
 // Tus upload server 
 app.use('/', (req, res, next) => {
-  authenticateUser(req, res, next)
+  // authenticateUser(req, res, next)
+  next()
 }, uploadApp)
 
 app.listen(port, () => {

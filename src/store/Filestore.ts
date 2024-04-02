@@ -73,4 +73,14 @@ export class ExtendedFileStore extends FileStore {
       }
     })
   }
+
+  downloadFile(file_id: string) {
+    const filePath = path.join(this.directory, file_id);
+    if (!fs.existsSync(filePath)) {
+      console.log('File not found');
+      throw new Error('File not found');
+    }
+    
+    return fs.createReadStream(path.join(this.directory, file_id))
+  }
 }
