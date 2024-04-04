@@ -1,43 +1,40 @@
-import { FileStore, Configstore } from '@tus/file-store'
-import fs from 'node:fs'
-import path from 'node:path'
-
+import { FileStore, Configstore } from '@tus/file-store';
+import fs from 'node:fs';
+import path from 'node:path';
 
 type Options = {
-  directory: string
-  configstore?: Configstore
-  expirationPeriodInMilliseconds?: number
-}
-
+  directory: string;
+  configstore?: Configstore;
+  expirationPeriodInMilliseconds?: number;
+};
 
 function formatBytes(bytes: number, decimals = 2): string {
-  if (bytes === 0) return '0 Bytes'
+  if (bytes === 0) return '0 Bytes';
 
-  const k = 1024
-  const dm = decimals < 0 ? 0 : decimals
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
 
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i]
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
-
 
 export class ExtendedFileStore extends FileStore {
   constructor(options: Options) {
-    super(options)
+    super(options);
   }
-  // Remove the folder
-  async removeFolder(id_or_path: string) {
+
+  async removeFolder(file_or_folder: string) {
     return new Promise((resolve, reject) => {
-      fs.rmdir(id_or_path, { recursive: true }, (err) => {
+      fs.rmdir(file_or_folder, { recursive: true }, (err) => {
         if (err) {
-          reject(err)
+          reject(err);
         } else {
-          resolve(void 0)
+          resolve(void 0);
         }
-      })
-    })
+      });
+    });
   }
 
   private traverseDirectory = (dir_path: string,
@@ -59,19 +56,19 @@ export class ExtendedFileStore extends FileStore {
     return { fileCount, size, fileList };
   }
 
-  async getFolderInfo(id_or_path: string) {
+  async getFolderInfo(file_or_folder: string) {
     return new Promise((resolve, reject) => {
-      if (!fs.existsSync(id_or_path)) {
-        return { fileCount: 0, readSize: '0 Bytes', fileList: [] };
+      if (!fs.existsSync(file_or_folder)) {
+        resolve({ error: "Resource file not found"});
       }
       try {
-        let { fileCount, size, fileList } = this.traverseDirectory(id_or_path);
+        let { fileCount, size, fileList } = this.traverseDirectory(file_or_folder);
         let readSize = formatBytes(size);
         resolve({ fileCount, readSize, fileList });
       } catch (err) {
         reject(err);
       }
-    })
+    });
   }
 
   downloadFile(file_id: string) {
@@ -81,6 +78,6 @@ export class ExtendedFileStore extends FileStore {
       throw new Error('File not found');
     }
     
-    return fs.createReadStream(path.join(this.directory, file_id))
+    return fs.createReadStream(path.join(this.directory, file_id));
   }
 }

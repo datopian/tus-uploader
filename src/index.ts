@@ -1,32 +1,35 @@
-import http from 'node:http'
-import path from 'path'
+import http from 'node:http';
+import path from 'path';
 
-import cors from "cors"
-import express, { Response, NextFunction } from 'express'
-import session from 'express-session'
-import bodyParser from 'body-parser'
-import { createClient } from '@redis/client'
-import { Server, Metadata, MemoryKvStore, RedisKvStore, FileKvStore } from '@tus/server'
-import { ExtendedFileStore } from './store/Filestore'
-import { S3Store } from '@tus/s3-store'
+import express, { Response, NextFunction } from 'express';
+import cors from 'cors';
+import session from 'express-session';
+import bodyParser from 'body-parser';
 
-import { authenticate } from './auth'
-import { config } from "./config"
-import companion from './companion'
+import { createClient } from '@redis/client';
 
-import { Request } from './types'
+import { Server, Metadata, MemoryKvStore, RedisKvStore, FileKvStore } from '@tus/server';
+import { S3Store } from '@tus/s3-store';
+
+import { authenticate } from './auth';
+import { config } from './config';
+import companion from './companion';
+import { ExtendedFileStore } from './store/Filestore';
+import { getResourceSummary, deleteResource, downloadFile } from './lib';
+
+import { Request } from './types';
 
 
-const app = express()
-const uploadApp = express()
+const app = express();
+const uploadApp = express();
 
-const port = config.serverPort
-const enableFolderUpload = config.enableFolderUpload
+const port = config.serverPort;
+const enableFolderUpload = config.enableFolderUpload;
 
 const corsOptions = {
   origin: (config.corsOrigin || '*').split(' '),
   credentials: true,
-}
+};
 
 app.use(
   session({
@@ -39,36 +42,36 @@ app.use(
       httpOnly: true,
       sameSite: 'lax',
       maxAge: config.sessionExpiry, // Default 24 hours,
-    }
-  })
-)
+    },
+  }),
+);
 
-app.use(bodyParser.json())
-app.use(cors(corsOptions))
+app.use(bodyParser.json());
+app.use(cors(corsOptions));
 
 const createRedisClient = () => {
   const redisClient = createClient({
-    url: config.redisUrl
-  })
-  redisClient.on("error", (error: Error) => console.error(`Error : ${error}`))
-  redisClient.connect()
-  return redisClient
-}
+    url: config.redisUrl,
+  });
+  redisClient.on("error", (error: Error) => console.error(`Error : ${error}`));
+  redisClient.connect();
+  return redisClient;
+};
 
 const configStore = () => {
   switch (config.configStore) {
     case 'memory':
-      return new MemoryKvStore()
+      return new MemoryKvStore();
     case 'redis':
-      const redisClient = createRedisClient()
+      const redisClient = createRedisClient();
       if (!redisClient) {
-        throw new Error('Redis client is not initialized')
+        throw new Error('Redis client is not initialized');
       }
-      return new RedisKvStore(redisClient as any, '')
+      return new RedisKvStore(redisClient as any, '');
     default:
-      return new FileKvStore(path.resolve(config.fileStorePath))
+      return new FileKvStore(path.resolve(config.fileStorePath));
   }
-}
+};
 
 const s3StoreDatastore = new S3Store({
   partSize: 8 * 1024 * 1024, // each uploaded part will have ~8MiB,
@@ -78,163 +81,168 @@ const s3StoreDatastore = new S3Store({
     endpoint: config.s3Endpoint,
     credentials: {
       accessKeyId: config.s3AccessKey,
-      secretAccessKey: config.s3AccessSecret
+      secretAccessKey: config.s3AccessSecret,
     },
-    region: config.s3Region
+    region: config.s3Region,
   },
   //@ts-ignore
-  cache: configStore()
-})
+  cache: configStore(),
+});
 
 const fileStoreDatastore = new ExtendedFileStore({
   directory: path.resolve(config.fileStorePath),
   expirationPeriodInMilliseconds: config.fileStoreExpiry,
-  configstore: configStore()
-})
+  configstore: configStore(),
+});
 
 const store = {
   "s3_store": s3StoreDatastore,
-  "file_store": fileStoreDatastore
-}
+  "file_store": fileStoreDatastore,
+};
 
 const getFileIdFromRequest = (req: Request) => {
-  return decodeURIComponent(req.url.replace(config.serverUploadPath + '/', ''))
-}
+  return decodeURIComponent(req.url.replace(config.serverUploadPath + '/', ''));
+};
 
 const server = new Server({
   path: config.serverUploadPath,
   datastore: store[config.storeType as keyof typeof store],
   relativeLocation: true,
   generateUrl(req: http.IncomingMessage, { proto, host, path, id }) {
-    let serverUrl: string = (config.serverUrl ?? host).replace(/\/$/, '')
-    let url = `${serverUrl}${path}/${id}`
-    return decodeURIComponent(url)
+    let serverUrl: string = (config.serverUrl ?? host).replace(/\/$/, '');
+    let url = `${serverUrl}${path}/${id}`;
+    return decodeURIComponent(url);
   },
 
   onResponseError: (req, res, err: any) => {
     // if error type is aborted, then it means the request was aborted by the client
     if (err.message === 'aborted') {
-      console.log('Request aborted by the client')
+      console.log('Request aborted by the client');
     } else {
-      console.error('Request failed:', err)
+      console.error('Request failed:', err);
     }
   },
 
   namingFunction: (req: http.IncomingMessage) => {
-    let name = ""
-    let meta: any = Metadata.parse(req.headers['upload-metadata'] as string)
-    const prefix = meta.resourceID + '/'
+    let name = "";
+    let meta: any = Metadata.parse(req.headers['upload-metadata'] as string);
+    const prefix = meta.resourceID + '/';
     if (meta.relativePath !== 'null' && enableFolderUpload) {
-      name = meta.relativePath
+      name = meta.relativePath;
     } else {
-      name = meta.name
+      name = meta.name;
     }
-    return decodeURIComponent(prefix + name)
+    return decodeURIComponent(prefix + name);
   },
 
   getFileIdFromRequest: (req: Request) => {
-    return getFileIdFromRequest(req)
-  }
-})
-
+    return getFileIdFromRequest(req);
+  },
+});
 
 const authenticateUser = async (req: Request, res: Response, next: NextFunction) => {
-  const objectId = req.headers['x-object-id'] as string // get object id from header
+  const objectId = req.headers['x-object-id'] as string; // get object id from header
 
-  const token = await authenticate(req, objectId)
-  const user = req.session.userId
+  const token = await authenticate(req, objectId);
+  const user = req.session.userId;
   if (user || (token && token.authorized)) {
-    req.session.userId = token.userId
-    next()
+    req.session.userId = token.userId;
+    next();
   } else {
-    res.status(401).send("Unauthorized user")
+    res.status(401).send("Unauthorized user");
   }
-}
+};
 
-uploadApp.all('*', server.handle.bind(server))
+uploadApp.all('*', server.handle.bind(server));
 
 // Log all requests
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`)
-  next()
-})
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
 
 // Uppy companion server
 if (config.companionUppyUpload) {
-  console.log(`Running with Uppy Companion at ${config.companionDomain}`)
-  app.use('/', companion.app)
-  companion.socket(app.listen(3020))
+  console.log(`Running with Uppy Companion at ${config.companionDomain}`);
+  app.use('/', companion.app);
+  companion.socket(app.listen(3020));
 }
 
 companion.emitter.on('upload-start', ({ token }: any) => {
-  console.log('Upload started', token)
+  console.log('Upload started', token);
   function onUploadEvent({ action, payload }: any) {
     if (action === 'success') {
-      companion.emitter.off(token, onUploadEvent) // avoid listener leak
-      console.log('Upload finished', token, payload.url)
+      companion.emitter.off(token, onUploadEvent); // avoid listener leak
+      console.log('Upload finished', token, payload.url);
     } else if (action === 'error') {
-      companion.emitter.off(token, onUploadEvent) // avoid listener leak
-      console.error('Upload failed', payload)
+      companion.emitter.off(token, onUploadEvent); // avoid listener leak
+      console.error('Upload failed', payload);
     }
   }
-  companion.emitter.on(token, onUploadEvent)
-})
+  companion.emitter.on(token, onUploadEvent);
+});
 
 // Log all requests
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`)
-  next()
-})
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
 
-app.post('/api/1/file/remove', authenticateUser, (req, res, next) => {
-  if (!req.body.id_or_path) {
-    res.status(400).json({ error: "file id or path is required" })
+app.post('/file/delete', authenticateUser, async(req, res, next) => {
+  const { resourceId } = req.body;
+  if (!resourceId) {
+    return res.status(400).json({ error: "Resource ID is required" });
   }
-
-  const folderPath = path.resolve(config.fileStorePath) + '/' + req.body.id_or_path
+  const resourcePath = path.join(config.fileStorePath, resourceId);
   try {
-    fileStoreDatastore.removeFolder(folderPath)
-    res.status(200).json({ message: "file or folder removed" })
+    await deleteResource(config.storeType, resourcePath);
+    return res.status(200).json({
+      message: "Resource deleted successfully",
+    });
   } catch (error) {
-    res.status(404).json({ error: "file or folder not found, or error occured" })
+    console.error(error);
+    return res.status(404).json({ error: "Resource file not found, or error occurred" });
   }
-  // TODO: Add S3 folder remove
-})
+});
 
-app.post('/api/1/files', authenticateUser, async (req, res, next) => {
-  if (!req.body.id_or_path) {
-    res.status(400).json({ error: "file id or path is required" })
+app.post('/file/summary', authenticateUser, async (req, res, next) => {
+  const { resourceId } = req.body;
+  if (!resourceId) {
+    return res.status(400).json({ error: "Resource ID is required" });
   }
-  const folderPath = path.resolve(config.fileStorePath) + '/' + req.body.id_or_path
-
+  const resourcePath = path.join(config.fileStorePath, resourceId);
   try {
-    const folderInfo = await fileStoreDatastore.getFolderInfo(folderPath)
-    res.status(200).json(folderInfo)
+    const resourceSummary = await getResourceSummary(config.storeType, resourcePath);
+    return res.status(200).json(resourceSummary);
   } catch (error) {
-    res.status(404).json({ error: "file or folder not found, or error occured" })
+    console.error(error);
+    return res.status(404).json({ error: "Resource file not found, or error occurred" });
   }
-  // TODO: Add S3 folder details
-})
+});
 
-app.get('/download/*', authenticateUser,  async (req: Request, res, next) => {
-  var filepath = req.params[0] || ''
-  let fileName = path.basename(filepath)
+app.get('/file/download/*', authenticateUser, async (req: Request, res, next) => {
+  var file = req.params[0] || '';
   try {
-    const fileStream = fileStoreDatastore.downloadFile(filepath);
+    const fileStream = await downloadFile(config.storeType, file);
+    /* @ts-ignore */
     return fileStream.pipe(res);
   } catch (error) {
     res.setHeader('Content-Disposition', '');
-    res.status(404).send("file not found")
+    res.status(404).send("Resource file not found");
   }
-})
+});
 
 // Tus upload server 
 app.use('/', (req, res, next) => {
-  // authenticateUser(req, res, next)
-  next()
-}, uploadApp)
+  authenticateUser(req, res, next);
+}, uploadApp);
 
 app.listen(port, () => {
-  console.log(`Server running at http://127.0.0.1:${port}`)
-  console.log(`Running server with : "${config.storeType}" and "${config.configStore}" config store`)
-})
+  console.log(`Server running at http://127.0.0.1:${port}`);
+  console.log(`Running server with : "${config.storeType}" and "${config.configStore}" config store`);
+});
+
+export {
+  fileStoreDatastore,
+  s3StoreDatastore,
+};

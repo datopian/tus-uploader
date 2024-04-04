@@ -1,8 +1,8 @@
-import * as companion from '@uppy/companion'
-import { config } from './config'
+import * as companion from '@uppy/companion';
+import { config } from './config';
 
-// extract protocal and host form url 
-const companionDomain = config.companionDomain
+// extract protocol and host form url 
+const companionDomain = config.companionDomain;
 const companionOptions = {
 	providerOptions: {
 		dropbox: {
@@ -19,14 +19,12 @@ const companionOptions = {
 	filePath: config.campanionTempPath,
 	secret: config.campanionSecret,
 	debug: config.debug
-}
+};
 
-let appResult = companion.app(companionOptions)
+let appResult = companion.app(companionOptions);
 
 export = {
 	app: appResult.app,
 	emitter: appResult.emitter,
 	socket: companion.socket,
-}
-
-
+};
