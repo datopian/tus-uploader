@@ -8,7 +8,7 @@ import bodyParser from 'body-parser'
 import { createClient } from '@redis/client'
 import { Server, Metadata, MemoryKvStore, RedisKvStore, FileKvStore } from '@tus/server'
 import { ExtendedFileStore } from './store/Filestore'
-import { S3Store } from '@tus/s3-store'
+import { S3Store } from './store/s3store'
 
 import { authenticate } from './auth'
 import { config } from "./config"
@@ -71,7 +71,6 @@ const configStore = () => {
 }
 
 const s3StoreDatastore = new S3Store({
-  partSize: 8 * 1024 * 1024, // each uploaded part will have ~8MiB,
   useTags: config.s3UseTags,
   s3ClientConfig: {
     bucket: config.s3Bucket,
@@ -123,7 +122,7 @@ const server = new Server({
   namingFunction: (req: http.IncomingMessage) => {
     let name = ""
     let meta: any = Metadata.parse(req.headers['upload-metadata'] as string)
-    const prefix = meta.resourceID + '/'
+    const prefix = meta.datasetID + '/'
     if (meta.relativePath !== 'null' && enableFolderUpload) {
       name = meta.relativePath
     } else {
@@ -214,7 +213,7 @@ app.post('/api/1/files', authenticateUser, async (req, res, next) => {
 
 // Tus upload server 
 app.use('/', (req, res, next) => {
-  authenticateUser(req, res, next)
+  next()
 }, uploadApp)
 
 app.listen(port, () => {
