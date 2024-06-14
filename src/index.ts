@@ -71,6 +71,7 @@ const configStore = () => {
 }
 
 const s3StoreDatastore = new S3Store({
+  partSize: config.s3PartSize,
   useTags: config.s3UseTags,
   s3ClientConfig: {
     bucket: config.s3Bucket,
@@ -212,9 +213,7 @@ app.post('/api/1/files', authenticateUser, async (req, res, next) => {
 })
 
 // Tus upload server 
-app.use('/', (req, res, next) => {
-  next()
-}, uploadApp)
+app.use('/', authenticateUser, uploadApp)
 
 app.listen(port, () => {
   console.log(`Server running at http://127.0.0.1:${port}`)
