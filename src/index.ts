@@ -80,7 +80,8 @@ const s3StoreDatastore = new S3Store({
       accessKeyId: config.s3AccessKey,
       secretAccessKey: config.s3AccessSecret
     },
-    region: config.s3Region
+    region: config.s3Region,
+    forcePathStyle: config.s3ForcePathStyle
   },
   //@ts-ignore
   cache: configStore()

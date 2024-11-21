@@ -31,6 +31,7 @@ const envs = {
     s3AccessSecret: process.env.S3_ACCESS_SECRET as string,
     s3Region: process.env.S3_REGION as string,
     s3PartSize: parseInt(process.env.S3_PART_SIZE as string) || 10485760,
+    s3ForcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true' || false,
 
     // Store configuration
     storeType: process.env.STORE_TYPE || 'file_store',
