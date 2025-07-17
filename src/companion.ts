@@ -18,7 +18,8 @@ const companionOptions = {
 	path: '/',
 	filePath: config.campanionTempPath,
 	secret: config.campanionSecret,
-	debug: config.debug
+	debug: config.debug,
+	uploadUrls: [config.serverUrl],
 }
 
 let appResult = companion.app(companionOptions)
